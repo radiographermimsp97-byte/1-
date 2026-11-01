@@ -1,0 +1,8 @@
+{
+  "name": "الفوج الرقمي",
+  "description": "نظام إدارة المناهج والتقدم الكشفي الجزائري - لوحة قائد الوحدة ومسؤول الإشراف والمتابعة",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

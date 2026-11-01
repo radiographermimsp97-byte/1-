@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="color-scheme" content="light dark">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>نظام إدارة المناهج والتقدم الكشفي - الفوج الرقمي</title>
+  
+  <!-- Bulletproof Native & Memory Storage Fallback (Fixes Android WebView opaque origin / SecurityError) -->
+  <script>
+    (function() {
+      var memoryStorage = {};
+
+      function safeGet(k) {
+        try {
+          if (window.AndroidBridge && typeof window.AndroidBridge.getStorageItem === 'function') {
+            var v = window.AndroidBridge.getStorageItem(k);
+            if (v !== null && v !== undefined) return v;
+          }
+        } catch(_) {}
+        return Object.prototype.hasOwnProperty.call(memoryStorage, k) ? memoryStorage[k] : null;
+      }
+
+      function safeSet(k, v) {
+        var strVal = String(v);
+        memoryStorage[k] = strVal;
+        try {
+          if (window.AndroidBridge && typeof window.AndroidBridge.setStorageItem === 'function') {
+            window.AndroidBridge.setStorageItem(k, strVal);
+          }
+        } catch(_) {}
+      }
+
+      function safeRemove(k) {
+        delete memoryStorage[k];
+        try {
+          if (window.AndroidBridge && typeof window.AndroidBridge.removeStorageItem === 'function') {
+            window.AndroidBridge.removeStorageItem(k);
+          }
+        } catch(_) {}
+      }
+
+      function safeClear() {
+        memoryStorage = {};
+        try {
+          if (window.AndroidBridge && typeof window.AndroidBridge.clearStorage === 'function') {
+            window.AndroidBridge.clearStorage();
+          }
+        } catch(_) {}
+      }
+
+      try {
+        if (window.AndroidBridge && typeof window.AndroidBridge.getAllStorageKeys === 'function') {
+          var rawKeys = window.AndroidBridge.getAllStorageKeys();
+          var parsedKeys = JSON.parse(rawKeys);
+          if (Array.isArray(parsedKeys)) {
+            for (var i = 0; i < parsedKeys.length; i++) {
+              var key = parsedKeys[i];
+              var val = window.AndroidBridge.getStorageItem(key);
+              if (val !== null && val !== undefined) {
+                memoryStorage[key] = val;
+              }
+            }
+          }
+        }
+      } catch(_) {}
+
+      var isNativeStorageAvailable = false;
+      try {
+        var testKey = "__scout_probe__";
+        window.localStorage.setItem(testKey, "1");
+        isNativeStorageAvailable = (window.localStorage.getItem(testKey) === "1");
+        window.localStorage.removeItem(testKey);
+      } catch(_) {
+        isNativeStorageAvailable = false;
+      }
+
+      if (!isNativeStorageAvailable) {
+        var storageProxy = {
+          getItem: safeGet,
+          setItem: safeSet,
+          removeItem: safeRemove,
+          clear: safeClear,
+          key: function(idx) {
+            var keys = Object.keys(memoryStorage);
+            return keys[idx] || null;
+          },
+          get length() {
+            return Object.keys(memoryStorage).length;
+          }
+        };
+
+        try {
+          Object.defineProperty(window, 'localStorage', {
+            value: storageProxy,
+            writable: true,
+            configurable: true
+          });
+        } catch(_) {
+          window.localStorage = storageProxy;
+        }
+      }
+    })();
+  </script>
+
+  <!-- Fast System Fonts Fallback + Google Cairo (Non-blocking for instant offline load) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"></noscript>
+  
+  <!-- Tailwind CSS Engine (Offline Bundled in APK) -->
+  <script src="libs/tailwind.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            scout: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              200: '#a7f3d0',
+              300: '#6ee7b7',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+              950: '#022c22',
+            },
+            badge: {
+              gold: '#F59E0B',
+              amber: '#D97706',
+              bronze: '#B45309',
+            }
+          },
+          fontFamily: {
+            cairo: ['Cairo', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 Production Engine (Pre-bundled offline inside APK) -->
+  <script src="libs/react.production.min.js"></script>
+  <script src="libs/react-dom.production.min.js"></script>
+
+  <!-- Mammoth.js for reading Word .docx files -->
+  <script src="libs/mammoth.browser.min.js"></script>
+
+  <style>
+    * {
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    #root {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #059669;
+    }
+
+    /* ============================================================
+       LIGHT MODE (الوضع النهاري الافتراضي)
+       ============================================================ */
+    .theme-light {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+    .theme-light .bg-black,
+    .theme-light .bg-slate-950 {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    .theme-light .bg-slate-900 {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+    }
+    .theme-light .bg-slate-900\/90,
+    .theme-light .bg-slate-900\/80,
+    .theme-light .bg-slate-900\/60 {
+      background-color: rgba(255, 255, 255, 0.96) !important;
+      color: #0f172a !important;
+    }
+    .theme-light .bg-slate-950\/90,
+    .theme-light .bg-slate-950\/80,
+    .theme-light .bg-slate-950\/70 {
+      background-color: rgba(241, 245, 249, 0.96) !important;
+      color: #0f172a !important;
+    }
+    .theme-light .bg-slate-800,
+    .theme-light .bg-slate-850 {
+      background-color: #e2e8f0 !important;
+      color: #1e293b !important;
+    }
+    .theme-light .border-slate-800,
+    .theme-light .border-slate-700,
+    .theme-light .border-slate-750,
+    .theme-light .border-slate-800\/80 {
+      border-color: #e2e8f0 !important;
+    }
+    .theme-light .text-white {
+      color: #0f172a !important;
+    }
+    .theme-light .text-slate-100,
+    .theme-light .text-slate-200 {
+      color: #1e293b !important;
+    }
+    .theme-light .text-slate-300,
+    .theme-light .text-slate-400 {
+      color: #475569 !important;
+    }
+    .theme-light .text-slate-500 {
+      color: #64748b !important;
+    }
+    .theme-light input,
+    .theme-light select,
+    .theme-light textarea {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      border-color: #cbd5e1 !important;
+    }
+    .theme-light input::placeholder,
+    .theme-light textarea::placeholder {
+      color: #94a3b8 !important;
+    }
+    .theme-light .bg-emerald-950,
+    .theme-light .bg-emerald-950\/90,
+    .theme-light .bg-emerald-950\/80,
+    .theme-light .bg-emerald-950\/40,
+    .theme-light .bg-emerald-950\/30 {
+      background-color: #ecfdf5 !important;
+      color: #065f46 !important;
+    }
+    .theme-light .border-emerald-800,
+    .theme-light .border-emerald-700\/60,
+    .theme-light .border-emerald-800\/80 {
+      border-color: #a7f3d0 !important;
+    }
+    .theme-light .text-emerald-400,
+    .theme-light .text-emerald-300 {
+      color: #047857 !important;
+    }
+    .theme-light .bg-amber-950,
+    .theme-light .bg-amber-950\/90,
+    .theme-light .bg-amber-950\/80,
+    .theme-light .bg-amber-950\/40 {
+      background-color: #fffbeb !important;
+      color: #92400e !important;
+    }
+    .theme-light .border-amber-800,
+    .theme-light .border-amber-700\/80,
+    .theme-light .border-amber-600\/70,
+    .theme-light .border-amber-800\/80 {
+      border-color: #fde68a !important;
+    }
+    .theme-light .text-amber-400,
+    .theme-light .text-amber-300,
+    .theme-light .text-amber-200 {
+      color: #b45309 !important;
+    }
+    .theme-light .bg-cyan-950,
+    .theme-light .bg-cyan-950\/40 {
+      background-color: #ecfeff !important;
+      color: #155e75 !important;
+    }
+    .theme-light .border-cyan-800,
+    .theme-light .border-cyan-700\/60,
+    .theme-light .border-cyan-800\/60 {
+      border-color: #a5f3fc !important;
+    }
+    .theme-light .text-cyan-400,
+    .theme-light .text-cyan-300 {
+      color: #0e7490 !important;
+    }
+    .theme-light .bg-indigo-950,
+    .theme-light .bg-indigo-950\/40 {
+      background-color: #eef2ff !important;
+      color: #3730a3 !important;
+    }
+    .theme-light .text-indigo-400,
+    .theme-light .text-indigo-300 {
+      color: #4338ca !important;
+    }
+    .theme-light .shadow-2xl,
+    .theme-light .shadow-xl {
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.07), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+    }
+    .theme-light .hover\:bg-slate-800:hover {
+      background-color: #cbd5e1 !important;
+    }
+    .theme-light .hover\:bg-slate-850:hover {
+      background-color: #e2e8f0 !important;
+    }
+    .theme-light .hover\:bg-slate-700:hover {
+      background-color: #94a3b8 !important;
+    }
+
+    
+    /* ============================================================
+       DARK MODE (الوضع الليلي المتكامل لراحة العين)
+       ============================================================ */
+    .theme-dark,
+    .dark {
+      background-color: #020617 !important;
+      color: #f1f5f9 !important;
+    }
+    .theme-dark .bg-black,
+    .theme-dark .bg-slate-950,
+    .dark .bg-black,
+    .dark .bg-slate-950 {
+      background-color: #020617 !important;
+      color: #f8fafc !important;
+    }
+    .theme-dark .bg-slate-900,
+    .dark .bg-slate-900 {
+      background-color: #0f172a !important;
+      color: #f8fafc !important;
+    }
+    .theme-dark .bg-slate-900\/90,
+    .theme-dark .bg-slate-900\/80,
+    .theme-dark .bg-slate-900\/60,
+    .dark .bg-slate-900\/90,
+    .dark .bg-slate-900\/80,
+    .dark .bg-slate-900\/60 {
+      background-color: rgba(15, 23, 42, 0.95) !important;
+      color: #f8fafc !important;
+    }
+    .theme-dark .bg-slate-950\/90,
+    .theme-dark .bg-slate-950\/80,
+    .theme-dark .bg-slate-950\/70,
+    .dark .bg-slate-950\/90,
+    .dark .bg-slate-950\/80,
+    .dark .bg-slate-950\/70 {
+      background-color: rgba(2, 6, 23, 0.95) !important;
+      color: #f8fafc !important;
+    }
+    .theme-dark .bg-slate-800,
+    .theme-dark .bg-slate-850,
+    .dark .bg-slate-800,
+    .dark .bg-slate-850 {
+      background-color: #1e293b !important;
+      color: #f1f5f9 !important;
+    }
+    .theme-dark .border-slate-800,
+    .theme-dark .border-slate-700,
+    .theme-dark .border-slate-750,
+    .dark .border-slate-800,
+    .dark .border-slate-700,
+    .dark .border-slate-750 {
+      border-color: #334155 !important;
+    }
+    .theme-dark input,
+    .theme-dark select,
+    .theme-dark textarea,
+    .dark input,
+    .dark select,
+    .dark textarea {
+      background-color: #090e1a !important;
+      color: #f8fafc !important;
+      border-color: #334155 !important;
+    }
+    .theme-dark input:focus,
+    .theme-dark select:focus,
+    .theme-dark textarea:focus,
+    .dark input:focus,
+    .dark select:focus,
+    .dark textarea:focus {
+      border-color: #10b981 !important;
+    }
+    .theme-dark input::placeholder,
+    .theme-dark textarea::placeholder,
+    .dark input::placeholder,
+    .dark textarea::placeholder {
+      color: #64748b !important;
+    }
+    .theme-dark select option,
+    .dark select option {
+      background-color: #0f172a !important;
+      color: #f8fafc !important;
+    }
+
+    /* Print Styles for Extracted Curriculum Document */
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+      .no-print, header, nav {
+        display: none !important;
+      }
+      .print-modal-container {
+        position: static !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .print-paper {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        width: 100% !important;
+      }
+      .print-table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+      }
+      .print-table th, .print-table td {
+        border: 1px solid #1e293b !important;
+        color: #000000 !important;
+      }
+    }
+  
+    footer {
+      border: none !important;
+      border-top: none !important;
+      border-bottom: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
+  <div id="root">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#020617;color:#fff;text-align:center;padding:24px;font-family:'Cairo',sans-serif;">
+      <div style="width:48px;height:48px;border:4px solid #1e293b;border-top:4px solid #10b981;border-radius:50%;animation:scoutSpin 0.8s linear infinite;margin-bottom:16px;"></div>
+      <h2 style="font-size:18px;font-weight:900;margin:0 0 6px 0;color:#34d399;">نظام الفوج الكشفي الرقمي</h2>
+      <p style="font-size:12px;color:#94a3b8;margin:0;">جاري تشغيل وتحميل النظام الكشفي...</p>
+      <style>@keyframes scoutSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('error', function(e) {
+      console.error("Global JS error caught:", e.message);
+      const root = document.getElementById("root");
+      if (root && root.innerText.includes("جاري تشغيل")) {
+        root.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#020617;color:#fff;text-align:center;padding:24px;font-family:sans-serif;">' +
+          '<div style="background:#450a0a;border:1px solid #dc2626;padding:20px;border-radius:20px;max-width:380px;">' +
+          '<h3 style="color:#f87171;font-weight:900;margin:0 0 8px 0;font-size:16px;">تنبيه في تشغيل النظام</h3>' +
+          '<p style="color:#cbd5e1;font-size:12px;margin:0 0 16px 0;">حدث خطأ أثناء بدء التشغيل: ' + (e.message || "خطأ غير متوقع") + '</p>' +
+          '<button onclick="location.reload()" style="background:#059669;color:#fff;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:12px;">إعادة تشغيل التطبيق</button>' +
+          '</div></div>';
+      }
+    });
+  </script>
+
+  <!-- Pre-compiled Native Production Bundle (فوري التشغيل 0ms بدون تأخير بابل) -->
+  <script src="app.bundle.js"></script>
+</body>
+</html>
